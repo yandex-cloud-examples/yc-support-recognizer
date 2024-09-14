@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<HTML>
+  <HEAD>
+    <meta charset="utf-8">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M15.71%207.293l-3.497-3.527C11.136%202.675%209.646%202%208%202s-3.136.675-4.213%201.766L.29%207.293a1.006%201.006%200%200%200%200%201.414l3.505%203.536C4.871%2013.328%206.358%2014%208%2014s3.129-.672%204.205-1.757l3.505-3.536a1.006%201.006%200%200%200%200-1.414zM8%2012c-2.206%200-4-1.794-4-4s1.794-4%204-4%204%201.794%204%204-1.794%204-4%204zm2-3.999l-2%202-2-2%202-2%202%202z%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E">
+    <style>
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: black;
+          color: gray;
+	        color-scheme: dark;
+        }
+      }
+      BODY {
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .over {
+        background-color: aquamarine;
+      }
+      H1 {
+        text-align: center;
+      }
+      H1::first-letter {
+        color: red;
+      }
+      TABLE,TD {
+        border: 1px solid;
+        border-collapse: collapse;
+      }
+      #img {
+        width: 100%
+      }
+      #img-div,#txt-div {
+        margin: 0 10px;
+        max-width: 45%;
+      }
+      #txt {
+        word-wrap: anywhere;
+      }
+      .flex {
+        display: flex;
+        align-items: start;
+        justify-content: center;
+      }
+      .id {
+        color: red;
+        font-weight: bold;
+      }
+      .post {
+        color: #999;
+        font-size: 12px;
+        margin-top: 100px;
+      }
+    </style>
+    <script type="text/javascript">
+      /*
+        all th objects are inside document.r (except onSCload)
+        functions:
+          myload - init function
+          onSCload - SmartCaptcha load
+          SCcallback - SmartCaptcha token result
+          opener - handles open icon click
+          paster - handles CTRL+V
+          droper (+prevent) - handles drag-n-drop
+          redo - re-sends last request
+          filer - handles objects, extracts data
+          escapeHtml - escapes strig to put into HTML
+          recognize - sends request, handles reply
+        objects:
+          SCtoken - holds SmartCaptch token
+          SCresolve - promise_resolver for SmartCaptcha
+          SCpromise - promise
+          f - input files passed by user
+          request - prepared request for Vision API
+          reply - Vision's server reply
+          result - parsed result
+      */
+      document.r = {};
+      document.r.myload=function(){
+        console.log('recognizr v1.4');
+        document.getElementById('txt-div').innerHTML = "Вставьте (Ctrl+V) или перетащите сюда изображение для распознавания";
+        let matches = document.cookie.match(/(?:^|; )SC=([^;]*)/);
+        let SCC = matches ? matches[1] : null; //SmartCaptcha client key
+        if (SCC) {
+          //inject SmartCaptcha
+          let e = document.createElement('script');
+          e.src = "https://smartcaptcha.yandexcloud.net/captcha.js?render=onload&onload=onSCload";
+          e.defer = true;
+          document.head.append(e);
+          document.getElementById('sc_legal').style.display = '';
+        }
+
+        //SmartCaptcha onload function
+        onSCload = function(){
+          if (!window.smartCaptcha) return;
+          window.smartCaptcha.render('captcha-container', {
+            sitekey: SCC,
+            invisible: true, // Сделать капчу невидимой
+            callback: document.r.SCcallback,
+            hideShield: true
+          });
+        }
+        
+        //SmartCaptcha callback
+        document.r.SCcallback = function(token) {
+          document.r.SCtoken = token;
+          if (document.r.SCresolve) document.r.SCresolve(token);
+        }
+
+        //Hanler of folder click
+        document.r.opener = function(){
+          var input = document.createElement('input');
+          input.type = 'file';
+          input.onchange = e => { 
+            document.r.f = e.target;
+            var item = e.target.files[0]; 
+            document.r.filer(item, 'open');
+          }
+          input.click();
+        }
+
+        //Handler of CTRL+V
+        document.r.paster = function(event){
+          var items = (event.clipboardData || event.originalEvent.clipboardData).items;
+          document.r.f = items;
+          for (index in items) {
+            var item = items[index];
+            console.log("pasted " + item.kind);
+            if (item.kind === 'file') {
+              var blob = item.getAsFile();
+              document.r.filer(blob, 'paste');
+            };
+          };
+        };
+        document.addEventListener('paste', document.r.paster, false);
+
+        //Handle drag-n-drop
+        document.r.prevent = function(e){
+          e.preventDefault();
+          e.stopPropagation();
+        };
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+          document.addEventListener(eventName, document.r.prevent, false);
+        });
+        document.r.droper = async function(e) {
+          document.body.classList.remove('over')
+          let dt = e.dataTransfer;
+          let files = dt.files;
+          console.log(files);
+          document.r.f = files;
+          if (files[0])
+            document.r.filer(files[0], 'drop');          
+        };
+        document.addEventListener('drop', document.r.droper, false);
+        document.addEventListener('dragover', function(){document.body.classList.add('over')}, false);
+        document.addEventListener('dragleave', function(){document.body.classList.remove('over')}, false);
+
+        //Handle model change
+        document.r.redo = function(e){
+          if (typeof(document.r.request) == 'undefined') return;
+          let rq = document.r.request;
+          let model = document.getElementById('model').value;
+          document.r.recognize(rq.img, rq.info, rq.type, model);
+        }
+        document.getElementById('model').addEventListener('change', document.r.redo);
+
+        //Handle file
+        document.r.filer = function(file, info){
+          console.log(file);
+          var ext = "";
+          if (file.name) ext = file.name.split('.').pop(); //file extension
+          //fill preview
+          var readerA = new FileReader();
+          readerA.onload = function(event){
+            let data = event.target.result;
+            document.getElementById("img").src = data;
+          };
+          readerA.readAsDataURL(file);
+          //start recognition
+          var readerB = new FileReader();
+          readerB.onload = function(event){
+            let data = btoa(event.target.result);
+            let model = document.getElementById("model").value;
+            document.r.recognize(data, info, ext, model);
+          };
+          readerB.readAsBinaryString(file);
+        }
+
+        document.r.escapeHtml = function(text){
+          var textNode = document.createTextNode(text);
+          var p = document.createElement('p');
+          p.appendChild(textNode); //or just p.innerText = text
+          return p.innerHTML;
+        }
+        //Contact server and recognize
+        document.r.recognize = async function(data, info, type, model){
+          //SmartCaptcha
+          let token = null;
+          if (SCC) {
+            document.r.SCpromise = new Promise(
+                function(resolve, reject) {
+                  document.r.SCresolve = resolve;
+                });
+            window.smartCaptcha.execute();
+            token = await document.r.SCpromise;
+            window.smartCaptcha.reset();
+          };
+          document.getElementById('txt-div').innerHTML = "Ожидаем ответа";
+          const url = document.location.origin + '/';
+          let request = {img: data};
+          if (typeof(info) != 'undefined') {
+            request.info = info;
+          }
+          if (typeof(type) != 'undefined') {
+            request.type = type;
+          }
+          if (typeof(model) != 'undefined') {
+            request.model = model;
+          }
+          document.r.request = request; //don't store token
+          if (token) request.token = token;
+          //send to server
+          let response = await fetch(url, {
+                  method: 'POST',
+                  body: JSON.stringify(request)
+                });
+          let result = await response.text();
+          document.r.reply = result;
+          //parse result
+          let tmp_result = {};
+          let step = {};
+          //poor quality error hanling. TODO:fix
+          try { step = JSON.parse(result) } catch (e) { tmp_result.error = 'failed to parse: ' + e + ' ' + result };
+          try { step = step?.result } catch (e) { tmp_result.error = 'bad response: ' + e + ' ' + JSON.stringify(step) };
+          try { tmp_result = step?.result } catch (e) { tmp_result.error = 'no text: ' + e + ' ' + JSON.stringify(step) };
+          
+          if (typeof(tmp_result?.error) != "undefined") {
+            document.getElementById('txt-div').innerHTML = tmp_result.error;
+            return false;
+          }
+          let my_result = tmp_result.textAnnotation;
+          if (typeof(my_result) == 'undefined' || typeof(my_result.blocks) == 'undefined') {
+            document.getElementById('txt-div').innerHTML = 'no result';
+            return false;
+          }
+
+          document.r.result = my_result;
+
+          text = "<p>" + my_result.blocks.map(function(a){
+            return a.lines.map(function(b){
+              return document.r.escapeHtml(b.text);
+            }).join('<br>');
+          }).join('</p><p>') + "</p>";
+
+          let tables = []
+          for (tbl of my_result.tables) {
+            let table = [];
+            for (let i=0; i<tbl.rowCount; i++) table.push(Array(tbl.columnCount));
+            for (cell of tbl.cells) {
+              let attr = '';
+              if (cell.columnSpan > 1) attr += ' colspan="' + cell.columnSpan + '"';
+              if (cell.rowSpan > 1) attr += ' rowspan="' + cell.rowSpan + '"';
+              table[cell.rowIndex][cell.columnIndex] = '<td' + attr + '>' + document.r.escapeHtml(cell.text) + '</td>'
+            }
+            table = table.map(function(row) {
+              return "<tr>" + row.join('') + "</tr>"
+            }).join('');
+            tables.push('<div><table>' + table + '</table></div>');
+          }
+          text = tables.join('<br>') + text;
+
+          //add id highlighting
+          text = text.replaceAll(/[a-z0-9]{20}/g, '<span class="id">$&</span>');
+          document.getElementById('txt-div').innerHTML = text;
+        };
+      }
+    </script>
+  <title>Yandex Vision OCR</title>
+  </HEAD>
+  <BODY onload="document.r.myload()">
+    <H1>Yandex Vision OCR</H1>
+    <div id="captcha-container"></div>
+    <div>
+      <div onclick="document.r.opener()" style="cursor: pointer; display: inline">
+        &#x1F4C2;&nbsp;</div>
+      <select id="model">
+        <option disabled>Модель</option>
+        <option value="page">Текст</option>
+        <option value="page-column-sort">Колонки</option>
+        <option value="table">Таблица</option>
+        <option value="handwritten">Рукописный</option>
+      </select>
+      <br>
+    </div>
+    <div class="flex">
+      <div id="txt-div">test</div>
+      <div id="img-div">
+        <img id="img">
+      </div>
+    </div>
+    <div class="post">Этот сервис не хранит каких-либо пользовательских данных.<br>
+      Все данные передаются напрямую в <a href="https://cloud.yandex.ru/services/vision">Yandex Vision</a>.<br>
+      <span id="sc_legal" style="display: none"><a href="https://yandex.ru/legal/smartcaptcha_notice/" target="_blank">Политика обработки данных SmartCaptcha</a><br></span>
+      Коммерческая тайна ООО «Яндекс», 119021, Россия,<br>
+      г. Москва, ул. Льва Толстого, д. 16<br>
+      Плагин для <a href="/pluginC.crx">Chrome/YaBro</a>, <a href="/pluginF.xpi">FireFox</a>
+    </div>
+  </BODY>
+</HTML>

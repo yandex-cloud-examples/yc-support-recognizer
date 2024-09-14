@@ -1,0 +1,29 @@
+{
+  "description": "Uses Vision to recognize image",
+  "manifest_version": 3,
+  "name": "Visionify",
+  "version": "1.4",
+  "homepage_url": "https://recognizr.yandex-team.ru/",
+    "icons": {
+    //convert -size 128x128 vision.svg vision128.png
+    "16": "vision16.png",
+    "32": "vision32.png",
+    "48": "vision48.png",
+    "64": "vision64.png",
+    "96": "vision96.png",
+    "128": "vision128.png"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "classic"
+  },
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://recognizr.yandex-team.ru/*"
+  ],
+  "update_url": "https://recognizr.yandex-team.ru/C"
+}

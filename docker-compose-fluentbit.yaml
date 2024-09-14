@@ -1,0 +1,33 @@
+version: '3.7'
+services:
+  recognizr:
+    container_name: recognizr
+    image: "cr.yandex/$repository/recognizr:latest"
+    ports:
+      - "80:8080"
+    restart: always
+    environment:
+      PORT: 8080
+    depends_on:
+      - fluentbit
+    logging:
+      # Fluent Bit понимает логи в этом формате.
+      driver: fluentd
+      options:
+        # Fluent Bit слушает логи на порту 24224.
+        fluentd-address: localhost:24224
+        # Теги используются для маршрутизации логов.
+        tag: app.logs
+
+  fluentbit:
+    container_name: fluentbit
+    image: cr.yandex/yc/fluent-bit-plugin-yandex:v1.0.3-fluent-bit-1.8.6
+    ports:
+      - 24224:24224
+      - 24224:24224/udp
+    restart: always
+    environment:
+      YC_GROUP_ID: e23flvuj9skm9st3lb8g
+    volumes:
+      - /etc/fluentbit/fluentbit.conf:/fluent-bit/etc/fluent-bit.conf
+      - /etc/fluentbit/parsers.conf:/fluent-bit/etc/parsers.conf

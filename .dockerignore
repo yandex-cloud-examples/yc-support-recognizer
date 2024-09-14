@@ -1,0 +1,10 @@
+docker-compose*
+func.sh
+*.sh
+node_modules
+plugin
+npm-debug.log
+rc.local
+restart.sh
+tar.sh
+.vscode-server

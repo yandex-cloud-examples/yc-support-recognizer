@@ -1,0 +1,14 @@
+version: '3.7'
+services:
+  app1:
+    container_name: recognizr
+    image: "cr.yandex/$repository/recognizr:latest"
+    ports:
+      - "80:8080"
+    restart: always
+    environment:
+      PORT: 8080
+      SCC: "ysc1_$smartcaptchaClientKey"
+      SCS: "ysc2_$smartcaptchaServerKey"
+#https://cloud.yandex.com/en/docs/cos/concepts/coi-specifications#compose-spec
+#https://docs.docker.com/compose/compose-file/05-services/
