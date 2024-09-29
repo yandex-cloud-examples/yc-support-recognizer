@@ -2,52 +2,44 @@
 
 ## Build
 
-### 1. Prepare FF plugin
-
-GoTo PluginFF folder.
-https://extensionworkshop.com/documentation/publish/package-your-extension/
-Create Zip file
-Send to Addons.mozilla.com to sign extension
-Download signed and save as pluginF1.X.xpi
-Update F.json (not included)
-
-### 2. Prepare Chome YaBro plugin
-
-Goto Plugin folder.
-https://developer.chrome.com/docs/extensions/get-started
-Use browser://extensions, developer mode, pack extension.
-Supply plugin.pem (not included)
-Save as pluginC1.X.crx
-Update C.xml (not included)
-
-### 3. Build docker image
+### 1. Build docker image
 
 You may need your own container registry
+https://yandex.cloud/docs/container-registry/operations/registry/registry-create
 
 login:
+
+```
 token=`yc iam create-token`
 docker login -u iam -p $token cr.yandex
+```
 
 build:
+
+```
 docker build . -t cr.yandex/$repository/recognizr
+```
 
 push:
-docker push cr.yandex/$repository/recognizr
 
-### 4.1 (Optional) create SmartCaptcha
+```
+docker push cr.yandex/$repository/recognizr
+```
+
+### 2.1 (Optional) create SmartCaptcha
 
 https://yandex.cloud/ru/docs/smartcaptcha/
 You'll need Server key and User key.
 
-### 4.2 (Optional) order certificate
+### 2.2 (Optional) order certificate
 
 You may use LetsEncrypt
 
-### 4.3 (Optional) register name
+### 2.3 (Optional) register name
 
 Use any available registrar
 
-### 5.A Provision serverles container
+### 3.A Provision serverles container
 
 Provide ContainerRegistry URL
 SCC as SmartCaptcha Client key
@@ -55,7 +47,7 @@ SCS as SmartCaptcha Server key
 Omit them if you don't want to protect your recognizr
 Hint: store keys in LockBox
 
-### 5B SetUp COI VM
+### 3.B SetUp COI VM
 
 use docker-compose-fluentbit.yaml as docker compose for COI
 (use docker-compose-simple.yaml if it's too hard for you)
